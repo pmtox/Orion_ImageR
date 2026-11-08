@@ -15,11 +15,22 @@ def test_binary_mask_values_and_extent():
     assert mask.sum() == 12
 
 
+def test_binary_mask_allows_zero_edge_width():
+    mask = make_rect_mask(8, 10, x=2, y=1, rect_width=4, rect_height=3, edge_width=0)
+    assert mask.sum() == 12
+    assert set(np.unique(mask)) == {0.0, 1.0}
+
+
 def test_soft_mask_has_graded_boundary():
     mask = make_rect_mask(12, 12, x=2, y=2, rect_width=8, rect_height=8, soft=True, edge_width=3)
     assert mask.min() == 0
     assert mask.max() == 1
     assert np.any((mask > 0) & (mask < 1))
+
+
+def test_soft_mask_rejects_nonpositive_edge_width():
+    with pytest.raises(ValueError, match="edge_width must be positive"):
+        make_rect_mask(8, 8, x=1, y=1, rect_width=4, rect_height=4, soft=True, edge_width=0)
 
 
 def test_corruption_preserves_visible_pixels_and_is_seeded():

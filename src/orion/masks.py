@@ -21,8 +21,8 @@ def make_rect_mask(
     """
     if min(height, width, rect_width, rect_height) <= 0:
         raise ValueError("Image and rectangle dimensions must be positive")
-    if edge_width <= 0:
-        raise ValueError("edge_width must be positive")
+    if soft and edge_width <= 0:
+        raise ValueError("edge_width must be positive when soft=True")
     x0, y0 = int(np.clip(x, 0, width)), int(np.clip(y, 0, height))
     x1, y1 = int(np.clip(x + rect_width, 0, width)), int(np.clip(y + rect_height, 0, height))
     if x1 <= x0 or y1 <= y0:
