@@ -1,3 +1,4 @@
 from .cnn import CNNInpaintingBaseline
+from .unet import UNetInpaintingModel
 
-__all__ = ["CNNInpaintingBaseline"]
+__all__ = ["CNNInpaintingBaseline", "UNetInpaintingModel"]

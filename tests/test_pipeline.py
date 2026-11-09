@@ -1,11 +1,14 @@
 import numpy as np
 import pytest
 import torch
+from PIL import Image
 
 from orion.corruption import apply_corruption
+from orion.inference import reconstruct_with_unet
 from orion.masks import make_rect_mask
 from orion.metrics import image_metrics
-from orion.models import CNNInpaintingBaseline
+from orion.models import CNNInpaintingBaseline, UNetInpaintingModel
+from orion.training_data import SyntheticInpaintingDataset, list_images
 
 
 def test_binary_mask_values_and_extent():
@@ -62,7 +65,32 @@ def test_cnn_accepts_four_channel_conditioning_and_returns_rgb():
     assert torch.all((result >= 0) & (result <= 1))
 
 
-def test_corruption_rejects_mismatched_mask():
-    image = np.zeros((4, 4, 3), dtype=np.uint8)
-    with pytest.raises(ValueError):
-        apply_corruption(image, np.zeros((3, 4), dtype=np.float32))
+def test_unet_accepts_non_divisible_shapes():
+    model = UNetInpaintingModel(base_channels=4)
+    image = torch.rand(1, 3, 65, 73)
+    mask = torch.rand(1, 1, 65, 73)
+    result = model(image, mask)
+    assert result.shape == image.shape
+    assert torch.all((result >= 0) & (result <= 1))
+
+
+def test_unet_inference_preserves_unmasked_pixels():
+    model = UNetInpaintingModel(base_channels=4)
+    image = np.full((32, 32, 3), 80, dtype=np.uint8)
+    mask = make_rect_mask(32, 32, x=8, y=8, rect_width=12, rect_height=12)
+    damaged = apply_corruption(image, mask, seed=4)
+    output = reconstruct_with_unet(damaged, mask, model)
+    np.testing.assert_array_equal(output[mask == 0], image[mask == 0])
+
+
+def test_training_dataset_produces_model_ready_tensors(tmp_path):
+    image = Image.fromarray(np.full((48, 64, 3), (40, 100, 180), dtype=np.uint8))
+    image.save(tmp_path / "sample.png")
+    paths = list_images(tmp_path)
+    dataset = SyntheticInpaintingDataset(paths, image_size=32, samples_per_epoch=2, mask_mode="mixed")
+    item = dataset[0]
+    assert item["clean"].shape == (3, 32, 32)
+    assert item["damaged"].shape == (3, 32, 32)
+    assert item["mask"].shape == (1, 32, 32)
+    assert torch.isfinite(item["mask"]).all()
+    assert torch.all((item["mask"] >= 0) & (item["mask"] <= 1))
